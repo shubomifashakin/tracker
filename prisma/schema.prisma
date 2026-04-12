@@ -1,0 +1,124 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum OrderStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum StopStatus {
+  PENDING
+  ARRIVED
+}
+
+model User {
+  id        String   @id @default(uuid(7))
+  firstName String   @map("first_name")
+  lastName  String   @map("last_name")
+  email     String   @unique() @map("email")
+  phone     String   @map("phone")
+  password  String   @map("password")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  driver   Driver?
+  customer Customer?
+
+  @@map("users")
+}
+
+model Vehicle {
+  id        String   @id @default(uuid(7))
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  licensePlate String  @map("license_plate")
+  make         String  @map("make")
+  model        String  @map("model")
+  year         Int     @map("year")
+  color        String  @map("color")
+  isActive     Boolean @default(true) @map("is_active")
+
+  driverId String @map("driver_id")
+  driver   Driver @relation(fields: [driverId], references: [id])
+
+  orders Order[]
+
+  @@map("vehicles")
+}
+
+model Driver {
+  id        String   @id @default(uuid(7))
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  userId String @unique() @map("user_id")
+  user   User   @relation(fields: [userId], references: [id])
+
+  orders   Order[]
+  vehicles Vehicle[]
+
+  @@map("drivers")
+}
+
+model Customer {
+  id        String   @id @default(uuid(7))
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  userId String @unique() @map("user_id")
+  user   User   @relation(fields: [userId], references: [id])
+
+  orders Order[]
+
+  @@map("customers")
+}
+
+model Order {
+  id         String      @id @default(uuid(7))
+  driverId   String?     @map("driver_id")
+  customerId String      @map("customer_id")
+  details    Json        @map("details")
+  status     OrderStatus @default(PENDING) @map("status")
+  driver     Driver?     @relation(fields: [driverId], references: [id])
+  customer   Customer    @relation(fields: [customerId], references: [id])
+  createdAt  DateTime    @default(now()) @map("created_at")
+  updatedAt  DateTime    @updatedAt @map("updated_at")
+  vehicleId  String?     @map("vehicle_id")
+  vehicle    Vehicle?    @relation(fields: [vehicleId], references: [id])
+
+  stops Stop[]
+
+  @@index(name: "driver_id_idx", fields: [driverId])
+  @@index(name: "customer_id_idx", fields: [customerId])
+  @@map("orders")
+}
+
+model Stop {
+  id        String     @id @default(uuid(7))
+  orderId   String     @map("order_id")
+  cellId    String     @map("cell_id")
+  name      String     @map("name")
+  address   String     @map("address")
+  latitude  Float      @map("latitude")
+  longitude Float      @map("longitude")
+  sequence  Int        @map("sequence")
+  status    StopStatus @default(PENDING) @map("status")
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+  arrivedAt DateTime?  @map("arrived_at")
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@unique(name: "order_sequence_unique", fields: [orderId, sequence])
+  @@map("stops")
+}
