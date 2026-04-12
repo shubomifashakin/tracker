@@ -30,8 +30,9 @@ model User {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  driver   Driver?
-  customer Customer?
+  driver        Driver?
+  customer      Customer?
+  refreshTokens RefreshToken[]
 
   @@map("users")
 }
@@ -121,4 +122,17 @@ model Stop {
 
   @@unique(name: "order_sequence_unique", fields: [orderId, sequence])
   @@map("stops")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid(7))
+  userId    String   @map("user_id")
+  token     String   @unique() @map("token")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("refresh_tokens")
 }

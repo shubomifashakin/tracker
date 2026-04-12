@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import * as argon2 from 'argon2';
 
-import { makeError } from '../../utils/fns';
+import { makeError } from '../../common/fns';
 import { FnResult } from '../../types/common.types';
 
 @Injectable()

@@ -8,7 +8,7 @@ import { ThrottlerStorageRecord } from '@nestjs/throttler/dist/throttler-storage
 
 import { createClient, RedisClientType, SetOptions } from 'redis';
 
-import { makeError } from '../../utils/fns';
+import { makeError } from '../../common/fns';
 import { FnResult } from '../../types/common.types';
 import { AppConfigService } from '../app-config/app-config.service';
 

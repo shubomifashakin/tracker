@@ -2,7 +2,7 @@ import * as h3 from 'h3-js';
 import { Injectable } from '@nestjs/common';
 
 import { FnResult } from '../../types/common.types';
-import { makeError } from '../../utils/fns';
+import { makeError } from '../../common/fns';
 
 @Injectable()
 export class H3Service {

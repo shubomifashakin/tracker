@@ -14,7 +14,8 @@ import {
   AppConfigService,
 } from './core';
 
-import { validate } from './utils/fns';
+import { validate } from './common/fns';
+import { AuthModule } from './modules/auth';
 
 @Module({
   imports: [
@@ -74,6 +75,7 @@ import { validate } from './utils/fns';
     AppConfigModule,
     DatabaseModule,
     HasherModule,
+    AuthModule,
   ],
   providers: [],
 })
