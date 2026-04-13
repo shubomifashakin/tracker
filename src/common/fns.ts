@@ -60,7 +60,16 @@ class EnvironmentVariables {
     if (isNaN(parsed)) throw new Error('Must be a valid number');
     return parsed;
   })
-  PING_INTERVAL: number;
+  TOTAL_PINGS_REQUIRED: number;
+
+  @IsNumber()
+  @Min(1)
+  @Transform(({ value }: { value: string }) => {
+    const parsed = parseInt(value);
+    if (isNaN(parsed)) throw new Error('Must be a valid number');
+    return parsed;
+  })
+  PING_INTERVAL_MS: number;
 }
 
 export function validate(config: Record<string, unknown>) {

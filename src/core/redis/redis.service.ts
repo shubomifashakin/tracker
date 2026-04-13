@@ -56,6 +56,26 @@ export class RedisService implements OnModuleDestroy, OnModuleInit {
     }
   }
 
+  async increment(key: string): Promise<FnResult<number>> {
+    try {
+      const result = await this.client.incr(key);
+
+      return { success: true, data: result, error: null };
+    } catch (error) {
+      return { success: false, data: null, error: makeError(error) };
+    }
+  }
+
+  async expire(key: string, ttl: number): Promise<FnResult<null>> {
+    try {
+      await this.client.expire(key, ttl);
+
+      return { success: true, data: null, error: null };
+    } catch (error) {
+      return { success: false, data: null, error: makeError(error) };
+    }
+  }
+
   async delete(key: string): Promise<FnResult<null>> {
     try {
       await this.client.del(key);

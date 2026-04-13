@@ -18,11 +18,24 @@ export class AppConfigService {
     }
   }
 
-  get PING_INTERVAL(): FnResult<number> {
+  get PING_INTERVAL_MS(): FnResult<number> {
     try {
-      const interval = this.configService.getOrThrow<number>('PING_INTERVAL');
+      const interval =
+        this.configService.getOrThrow<number>('PING_INTERVAL_MS');
 
       return { success: true, data: interval, error: null };
+    } catch (error) {
+      return { success: false, data: null, error: makeError(error) };
+    }
+  }
+
+  get TOTAL_PINGS_REQUIRED(): FnResult<number> {
+    try {
+      const count = this.configService.getOrThrow<number>(
+        'TOTAL_PINGS_REQUIRED',
+      );
+
+      return { success: true, data: count, error: null };
     } catch (error) {
       return { success: false, data: null, error: makeError(error) };
     }
