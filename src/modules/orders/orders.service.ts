@@ -435,21 +435,21 @@ export class OrdersService {
     }
   }
 
-  async getAvailableOrders(cursor?: string) {
+  async getAvailableOrders(cursor?: string, limit: number = this.limit) {
     const orders = await this.databaseService.order.findMany({
       where: {
         status: 'PENDING',
       },
       cursor: cursor ? { id: cursor } : undefined,
-      take: this.limit + 1,
+      take: limit + 1,
       orderBy: {
         createdAt: 'desc',
       },
     });
 
-    const hasMore = orders.length > this.limit;
-    const nextCursor = hasMore ? orders[this.limit].id : null;
-    const actualOrders = orders.slice(0, this.limit);
+    const hasMore = orders.length > limit;
+    const nextCursor = hasMore ? orders[limit].id : null;
+    const actualOrders = orders.slice(0, limit);
 
     return { orders: actualOrders, hasMore, nextCursor };
   }
@@ -458,6 +458,7 @@ export class OrdersService {
     customerId: string,
     cursor?: string,
     status?: OrderStatus,
+    limit: number = this.limit,
   ) {
     const orders = await this.databaseService.order.findMany({
       where: {
@@ -465,15 +466,15 @@ export class OrdersService {
         customerId,
       },
       cursor: cursor ? { id: cursor } : undefined,
-      take: this.limit + 1,
+      take: limit + 1,
       orderBy: {
         createdAt: 'desc',
       },
     });
 
-    const hasMore = orders.length > this.limit;
-    const nextCursor = hasMore ? orders[this.limit].id : null;
-    const actualOrders = orders.slice(0, this.limit);
+    const hasMore = orders.length > limit;
+    const nextCursor = hasMore ? orders[limit].id : null;
+    const actualOrders = orders.slice(0, limit);
 
     return { orders: actualOrders, hasMore, nextCursor };
   }
@@ -482,6 +483,7 @@ export class OrdersService {
     driverId: string,
     cursor?: string,
     status?: OrderStatus,
+    limit: number = this.limit,
   ) {
     const orders = await this.databaseService.order.findMany({
       where: {
@@ -489,15 +491,15 @@ export class OrdersService {
         driverId,
       },
       cursor: cursor ? { id: cursor } : undefined,
-      take: this.limit + 1,
+      take: limit + 1,
       orderBy: {
         createdAt: 'desc',
       },
     });
 
-    const hasMore = orders.length > this.limit;
-    const nextCursor = hasMore ? orders[this.limit].id : null;
-    const actualOrders = orders.slice(0, this.limit);
+    const hasMore = orders.length > limit;
+    const nextCursor = hasMore ? orders[limit].id : null;
+    const actualOrders = orders.slice(0, limit);
 
     return { orders: actualOrders, hasMore, nextCursor };
   }
