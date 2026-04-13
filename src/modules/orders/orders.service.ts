@@ -154,6 +154,18 @@ export class OrdersService {
   }
 
   async driverPing(driverId: string, orderId: string, dto: DriverPingDto) {
+    const order = await this.databaseService.order.findUnique({
+      where: { id: orderId, driverId, status: 'IN_PROGRESS' },
+    });
+
+    if (!order) {
+      this.logger.warn({
+        message: 'Order not found or not assigned to driver',
+      });
+
+      throw new NotFoundException('Order not found or not assigned to driver');
+    }
+
     const convertCoordsToCell = this.h3Service.latLngToCell(
       dto.lat,
       dto.lng,
