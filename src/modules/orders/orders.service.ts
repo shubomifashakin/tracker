@@ -8,6 +8,7 @@ import {
 
 import {
   BUFFER_MS,
+  makePingLockKey,
   makeOrderStopKey,
   makeDriverPingKey,
 } from './common/constants';
@@ -161,7 +162,7 @@ export class OrdersService {
         sequence: firstStop.sequence,
       });
 
-      if (!setFirstStop) {
+      if (!setFirstStop.success) {
         this.logger.error({
           message: 'Failed to set first stop in Redis',
         });
@@ -262,18 +263,18 @@ export class OrdersService {
               isAvailable: true,
             },
           });
-
-          const deletedStop = await this.redisService.delete(
-            makeOrderStopKey(orderId),
-          );
-
-          if (!deletedStop.success) {
-            this.logger.error({
-              message: `Failed to delete current stop for orderId:${orderId} from cache`,
-              error: deletedStop.error,
-            });
-          }
         });
+
+        const deletedStop = await this.redisService.delete(
+          makeOrderStopKey(orderId),
+        );
+
+        if (!deletedStop.success) {
+          this.logger.error({
+            message: `Failed to delete current stop for orderId:${orderId} from cache`,
+            error: deletedStop.error,
+          });
+        }
 
         return { message: 'order completed' };
       }
@@ -315,84 +316,109 @@ export class OrdersService {
       throw new InternalServerErrorException();
     }
 
-    const cacheTTlSecs =
-      (totalPingsRequired.data * pingInterval.data + BUFFER_MS) / 1000;
-    const totalPings = await this.redisService.increment(
-      makeDriverPingKey(driverId, orderId, currentStop.cellId),
-    );
-
-    if (!totalPings.success) {
-      this.logger.error({
-        message: `Failed to increment driver ping count for driverId:${driverId}, orderId:${orderId}, cellId:${currentStop.cellId}`,
-        error: totalPings.error,
+    const lockKey = makePingLockKey(driverId, orderId);
+    try {
+      const acquiredLock = await this.redisService.set(lockKey, true, {
+        condition: 'NX',
+        expiration: { type: 'EX', value: 15 },
       });
 
-      throw new InternalServerErrorException();
-    }
-
-    if (totalPings.data === 1) {
-      const expired = await this.redisService.expire(
-        makeDriverPingKey(driverId, orderId, currentStop.cellId),
-        cacheTTlSecs,
-      );
-
-      if (!expired.success) {
+      if (!acquiredLock.success) {
         this.logger.error({
-          message: `Failed to set ttl for driver ping count for driverId:${driverId}, orderId:${orderId}, cellId:${currentStop.cellId}`,
-          error: expired.error,
+          message: `Failed to acquire lock for driverId:${driverId}, orderId:${orderId}`,
+          error: acquiredLock.error,
         });
-      }
-    }
 
-    if (totalPings.data < totalPingsRequired.data) {
-      this.logger.debug(
-        `Driver ${driverId} has pinged ${totalPings.data} times for order ${orderId}, cellId: ${currentStop.cellId}`,
+        throw new InternalServerErrorException();
+      }
+
+      if (acquiredLock.data !== 'OK') {
+        return { messsage: 'success' };
+      }
+
+      const cacheTTlSecs =
+        (totalPingsRequired.data * pingInterval.data + BUFFER_MS) / 1000;
+      const totalPings = await this.redisService.increment(
+        makeDriverPingKey(driverId, orderId, currentStop.cellId),
       );
 
-      return { message: 'success' };
-    }
+      if (!totalPings.success) {
+        this.logger.error({
+          message: `Failed to increment driver ping count for driverId:${driverId}, orderId:${orderId}, cellId:${currentStop.cellId}`,
+          error: totalPings.error,
+        });
 
-    await this.databaseService.$transaction(async (tx) => {
-      await tx.stop.update({
-        where: { id: currentStop.id },
-        data: { status: 'ARRIVED', arrivedAt: new Date() },
-      });
+        throw new InternalServerErrorException();
+      }
 
-      const nextStop = await tx.stop.findFirst({
-        where: { orderId, sequence: currentStop.sequence + 1 },
-        select: { id: true, cellId: true, sequence: true },
-      });
+      if (totalPings.data === 1) {
+        const expired = await this.redisService.expire(
+          makeDriverPingKey(driverId, orderId, currentStop.cellId),
+          cacheTTlSecs,
+        );
 
-      if (nextStop) {
-        const cachedNextStop = await this.cacheStop(orderId, nextStop);
-
-        if (!cachedNextStop.success) {
+        if (!expired.success) {
           this.logger.error({
-            message: `Failed to cache next stop for orderId:${orderId}`,
-            error: cachedNextStop.error,
+            message: `Failed to set ttl for driver ping count for driverId:${driverId}, orderId:${orderId}, cellId:${currentStop.cellId}`,
+            error: expired.error,
           });
         }
-      } else {
-        await tx.order.update({
-          where: { id: orderId },
-          data: { status: 'COMPLETED' },
+      }
+
+      if (totalPings.data < totalPingsRequired.data) {
+        this.logger.debug(
+          `Driver ${driverId} has pinged ${totalPings.data} times for order ${orderId}, cellId: ${currentStop.cellId}`,
+        );
+
+        return { message: 'success' };
+      }
+
+      let nextStop: CachedStop | null = null;
+
+      await this.databaseService.$transaction(async (tx) => {
+        await tx.stop.update({
+          where: { id: currentStop.id },
+          data: { status: 'ARRIVED', arrivedAt: new Date() },
         });
 
-        await tx.driver.update({
-          where: { id: driverId },
-          data: {
-            isAvailable: true,
-          },
+        nextStop = await tx.stop.findFirst({
+          where: { orderId, sequence: currentStop.sequence + 1 },
+          select: { id: true, cellId: true, sequence: true },
         });
 
-        const deleteResult = await this.redisService.delete(
+        if (nextStop) {
+          const cachedNextStop = await this.cacheStop(orderId, nextStop);
+
+          if (!cachedNextStop.success) {
+            this.logger.error({
+              message: `Failed to cache next stop for orderId:${orderId}`,
+              error: cachedNextStop.error,
+            });
+          }
+        } else {
+          await tx.order.update({
+            where: { id: orderId },
+            data: { status: 'COMPLETED' },
+          });
+
+          await tx.driver.update({
+            where: { id: driverId },
+            data: {
+              isAvailable: true,
+            },
+          });
+        }
+      });
+
+      if (!nextStop) {
+        const deleteStop = await this.redisService.delete(
           makeOrderStopKey(orderId),
         );
 
-        if (!deleteResult.success) {
+        if (!deleteStop.success) {
           this.logger.error({
             message: `Failed to delete order stop key for orderId:${orderId}`,
-            error: deleteResult.error,
+            error: deleteStop.error,
           });
         }
       }
@@ -407,9 +433,18 @@ export class OrdersService {
           error: deletedPings.error,
         });
       }
-    });
 
-    return { message: 'success' };
+      return { message: 'success' };
+    } finally {
+      const removedLock = await this.redisService.delete(lockKey);
+
+      if (!removedLock.success) {
+        this.logger.error({
+          message: `Failed to remove lock - ${lockKey}`,
+          error: removedLock.error,
+        });
+      }
+    }
   }
 
   async getAvailableOrders(cursor?: string) {

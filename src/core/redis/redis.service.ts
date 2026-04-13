@@ -32,11 +32,11 @@ export class RedisService implements OnModuleDestroy, OnModuleInit {
     key: string,
     value: any,
     options?: SetOptions,
-  ): Promise<FnResult<null>> {
+  ): Promise<FnResult<string | null>> {
     try {
-      await this.client.set(key, JSON.stringify(value), options);
+      const result = await this.client.set(key, JSON.stringify(value), options);
 
-      return { success: true, data: null, error: null };
+      return { success: true, data: result, error: null };
     } catch (error) {
       return { success: false, data: null, error: makeError(error) };
     }

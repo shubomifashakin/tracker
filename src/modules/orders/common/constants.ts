@@ -10,4 +10,8 @@ export function makeDriverPingKey(
   return `driver:${driverId}:ping:${orderId}:${stopId}`;
 }
 
+export function makePingLockKey(driverId: string, orderId: string) {
+  return `lock:driver:${driverId}:order:${orderId}`;
+}
+
 export const BUFFER_MS = 15000;
