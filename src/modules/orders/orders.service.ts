@@ -338,8 +338,10 @@ export class OrdersService {
 
       const cacheTTlSecs =
         (totalPingsRequired.data * pingInterval.data + BUFFER_MS) / 1000;
-      const totalPings = await this.redisService.increment(
+
+      const totalPings = await this.redisService.incrementWithTTL(
         makeDriverPingKey(driverId, orderId, currentStop.cellId),
+        cacheTTlSecs,
       );
 
       if (!totalPings.success) {
@@ -349,20 +351,6 @@ export class OrdersService {
         });
 
         throw new InternalServerErrorException();
-      }
-
-      if (totalPings.data === 1) {
-        const expired = await this.redisService.expire(
-          makeDriverPingKey(driverId, orderId, currentStop.cellId),
-          cacheTTlSecs,
-        );
-
-        if (!expired.success) {
-          this.logger.error({
-            message: `Failed to set ttl for driver ping count for driverId:${driverId}, orderId:${orderId}, cellId:${currentStop.cellId}`,
-            error: expired.error,
-          });
-        }
       }
 
       if (totalPings.data < totalPingsRequired.data) {
@@ -411,14 +399,14 @@ export class OrdersService {
       });
 
       if (!nextStop) {
-        const deleteStop = await this.redisService.delete(
+        const deletePreviousStopFromCache = await this.redisService.delete(
           makeOrderStopKey(orderId),
         );
 
-        if (!deleteStop.success) {
+        if (!deletePreviousStopFromCache.success) {
           this.logger.error({
-            message: `Failed to delete order stop key for orderId:${orderId}`,
-            error: deleteStop.error,
+            message: `Failed to delete previous stop from cache for orderId:${orderId}`,
+            error: deletePreviousStopFromCache.error,
           });
         }
       }

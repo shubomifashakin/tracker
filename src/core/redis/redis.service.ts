@@ -66,6 +66,31 @@ export class RedisService implements OnModuleDestroy, OnModuleInit {
     }
   }
 
+  async incrementWithTTL(key: string, ttl: number): Promise<FnResult<number>> {
+    try {
+      const script = `
+      local key = KEYS[1]
+      local ttl = ARGV[1]
+      
+      local current = redis.call('INCR', key)
+      if current == 1 then
+        redis.call('EXPIRE', key, ttl)
+      end
+      
+      return current
+    `;
+
+      const result = await this.client.eval(script, {
+        keys: [key],
+        arguments: [ttl.toString()],
+      });
+
+      return { success: true, data: result as number, error: null };
+    } catch (error) {
+      return { success: false, data: null, error: makeError(error) };
+    }
+  }
+
   async expire(key: string, ttl: number): Promise<FnResult<null>> {
     try {
       await this.client.expire(key, ttl);
