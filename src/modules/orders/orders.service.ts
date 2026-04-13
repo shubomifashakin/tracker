@@ -106,6 +106,21 @@ export class OrdersService {
     }
 
     await this.databaseService.$transaction(async (tx) => {
+      const driverIsAvailable = await tx.driver.findFirst({
+        where: {
+          id: driverId,
+          isAvailable: true,
+        },
+      });
+
+      if (!driverIsAvailable) {
+        this.logger.warn({
+          message: 'Driver is not available',
+        });
+
+        throw new BadRequestException('Driver is not available');
+      }
+
       const order = await tx.$queryRaw<{ id: string; status: OrderStatus }[]>`
       SELECT id, status FROM orders 
       WHERE id = ${orderId} 
@@ -129,7 +144,12 @@ export class OrdersService {
         },
       });
 
-      //FIXME: there should be a way we can mark the driver as in order or busy
+      await tx.driver.update({
+        where: { id: driverId },
+        data: {
+          isAvailable: false,
+        },
+      });
 
       const firstStop = await tx.stop.findFirstOrThrow({
         where: { orderId, sequence: 1 },
@@ -224,27 +244,36 @@ export class OrdersService {
           message: `No pending stops found for orderId:${orderId}, order completed.`,
         });
 
-        await this.databaseService.order.update({
-          where: {
-            id: orderId,
-          },
-          data: {
-            status: 'COMPLETED',
-          },
-        });
-
-        const deletedStop = await this.redisService.delete(
-          makeOrderStopKey(orderId),
-        );
-
-        if (!deletedStop.success) {
-          this.logger.error({
-            message: `Failed to delete current stop for orderId:${orderId} from cache`,
-            error: deletedStop.error,
+        await this.databaseService.$transaction(async (tx) => {
+          await tx.order.update({
+            where: {
+              id: orderId,
+            },
+            data: {
+              status: 'COMPLETED',
+            },
           });
-        }
 
-        //free the driver
+          await tx.driver.update({
+            where: {
+              id: driverId,
+            },
+            data: {
+              isAvailable: true,
+            },
+          });
+
+          const deletedStop = await this.redisService.delete(
+            makeOrderStopKey(orderId),
+          );
+
+          if (!deletedStop.success) {
+            this.logger.error({
+              message: `Failed to delete current stop for orderId:${orderId} from cache`,
+              error: deletedStop.error,
+            });
+          }
+        });
 
         return { message: 'order completed' };
       }
@@ -286,7 +315,8 @@ export class OrdersService {
       throw new InternalServerErrorException();
     }
 
-    const ttl = totalPingsRequired.data * pingInterval.data + BUFFER_MS;
+    const cacheTTlSecs =
+      (totalPingsRequired.data * pingInterval.data + BUFFER_MS) / 1000;
     const totalPings = await this.redisService.increment(
       makeDriverPingKey(driverId, orderId, currentStop.cellId),
     );
@@ -303,7 +333,7 @@ export class OrdersService {
     if (totalPings.data === 1) {
       const expired = await this.redisService.expire(
         makeDriverPingKey(driverId, orderId, currentStop.cellId),
-        ttl,
+        cacheTTlSecs,
       );
 
       if (!expired.success) {
@@ -322,7 +352,6 @@ export class OrdersService {
       return { message: 'success' };
     }
 
-    //update the stop and get the new stop if any
     await this.databaseService.$transaction(async (tx) => {
       await tx.stop.update({
         where: { id: currentStop.id },
@@ -349,6 +378,13 @@ export class OrdersService {
           data: { status: 'COMPLETED' },
         });
 
+        await tx.driver.update({
+          where: { id: driverId },
+          data: {
+            isAvailable: true,
+          },
+        });
+
         const deleteResult = await this.redisService.delete(
           makeOrderStopKey(orderId),
         );
@@ -359,21 +395,19 @@ export class OrdersService {
             error: deleteResult.error,
           });
         }
+      }
 
-        // FIXME: FREE THE DRIVER
+      const deletedPings = await this.redisService.delete(
+        makeDriverPingKey(driverId, orderId, currentStop.cellId),
+      );
+
+      if (!deletedPings.success) {
+        this.logger.error({
+          message: `Failed to delete driver ping key for driverId:${driverId}, orderId:${orderId}, cellId:${currentStop.cellId}`,
+          error: deletedPings.error,
+        });
       }
     });
-
-    const deleteResult = await this.redisService.delete(
-      makeDriverPingKey(driverId, orderId, currentStop.cellId),
-    );
-
-    if (!deleteResult.success) {
-      this.logger.error({
-        message: `Failed to delete driver ping key for driverId:${driverId}, orderId:${orderId}, cellId:${currentStop.cellId}`,
-        error: deleteResult.error,
-      });
-    }
 
     return { message: 'success' };
   }
