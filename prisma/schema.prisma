@@ -62,6 +62,8 @@ model Driver {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  isAvailable Boolean @default(true) @map("is_available")
+
   userId String @unique() @map("user_id")
   user   User   @relation(fields: [userId], references: [id])
 
