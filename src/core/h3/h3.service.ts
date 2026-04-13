@@ -11,7 +11,7 @@ export class H3Service {
   latLngToCell(
     lat: number,
     lng: number,
-    resolution: number = 10,
+    resolution: number = 9,
   ): FnResult<string> {
     try {
       const data = h3.latLngToCell(lat, lng, resolution);
