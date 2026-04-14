@@ -17,6 +17,7 @@ import {
 import { validate } from './common/fns';
 import { AuthModule } from './modules/auth';
 import { OrdersModule } from './modules/orders';
+import { CustomersModule } from './modules/customers/customers.module';
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { OrdersModule } from './modules/orders';
     HasherModule,
     AuthModule,
     OrdersModule,
+    CustomersModule,
   ],
   providers: [],
 })

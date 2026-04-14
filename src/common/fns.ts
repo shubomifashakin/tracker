@@ -47,10 +47,12 @@ class EnvironmentVariables {
 
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }: { value: string }) => value.replace(/\\n/g, '\n'))
   JWT_PRIVATE_KEY: string;
 
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }: { value: string }) => value.replace(/\\n/g, '\n'))
   JWT_PUBLIC_KEY: string;
 
   @IsNumber()

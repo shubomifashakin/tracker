@@ -41,7 +41,7 @@ export class CustomersController {
     @Query('status', new ParseEnumPipe(OrderStatus, { optional: true }))
     status?: OrderStatus,
     @Query('cursor') cursor?: string,
-    @Query('limit', ParseIntPipe) limit?: number,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
   ) {
     return this.customersService.getOrders(req.user.id, status, cursor, limit);
   }
