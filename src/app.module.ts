@@ -18,6 +18,8 @@ import { validate } from './common/fns';
 import { AuthModule } from './modules/auth';
 import { OrdersModule } from './modules/orders';
 import { CustomersModule } from './modules/customers/customers.module';
+import { DriversModule } from './modules/drivers/drivers.module';
+import { VehiclesModule } from './modules/vehicles/vehicles.module';
 
 @Module({
   imports: [
@@ -80,6 +82,8 @@ import { CustomersModule } from './modules/customers/customers.module';
     AuthModule,
     OrdersModule,
     CustomersModule,
+    DriversModule,
+    VehiclesModule,
   ],
   providers: [],
 })

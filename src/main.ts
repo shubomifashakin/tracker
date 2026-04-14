@@ -34,6 +34,9 @@ async function bootstrap() {
   app.set('trust proxy', true);
   app.enableShutdownHooks([ShutdownSignal.SIGTERM, ShutdownSignal.SIGINT]);
 
+  //FIXME: IMPLEMENT PRISMA FILTERS
+  app.useGlobalFilters();
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
