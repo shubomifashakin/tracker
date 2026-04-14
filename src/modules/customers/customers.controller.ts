@@ -16,9 +16,12 @@ import { CustomersService } from './customers.service';
 
 import { CreateOrderDto } from '../orders';
 
-import { AuthGuard } from '../../common/guards/auth/auth.guard';
-
 import { OrderStatus } from '../../../generated/prisma/enums';
+import {
+  AuthGuard,
+  IsIdempotent,
+  OrderIdempotencyInterceptor,
+} from '../../common';
 
 @Controller('customers')
 @UseGuards(AuthGuard)
@@ -26,8 +29,8 @@ export class CustomersController {
   constructor(private readonly customersService: CustomersService) {}
 
   @Post('orders')
-  //FIXME: Add idempotency interceptor
-  @UseInterceptors()
+  @UseInterceptors(OrderIdempotencyInterceptor)
+  @IsIdempotent({ required: true })
   createOrder(@Body() dto: CreateOrderDto, @Req() req: Request) {
     return this.customersService.createOrder(req.user.id, dto);
   }
