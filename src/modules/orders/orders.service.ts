@@ -279,12 +279,12 @@ export class OrdersService {
         return { message: 'order completed' };
       }
 
-      const cachedStop = await this.cacheStop(orderId, currentStop);
+      const setCacheStop = await this.cacheStop(orderId, currentStop);
 
-      if (!cachedStop.success) {
+      if (!setCacheStop.success) {
         this.logger.error({
           message: `Failed to cache current stop for orderId:${orderId}`,
-          error: cachedStop.error,
+          error: setCacheStop.error,
         });
       }
     }
