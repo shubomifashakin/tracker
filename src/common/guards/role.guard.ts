@@ -38,6 +38,41 @@ export class RolesGuard implements CanActivate {
     private readonly databaseService: DatabaseService,
   ) {}
 
+  private async resolveRole<T extends { id: string }>(
+    cacheKey: string,
+    dbLookup: () => Promise<T | null>,
+  ): Promise<T | null> {
+    const cached = await this.redisService.get<T>(cacheKey);
+
+    if (!cached.success) {
+      this.logger.error({
+        message: 'Failed to get role from cache',
+        error: cached.error,
+      });
+    }
+
+    if (cached.data) return cached.data;
+
+    this.logger.debug({ message: 'Role cache miss' });
+
+    const result = await dbLookup();
+
+    if (!result) return null;
+
+    const stored = await this.redisService.set(cacheKey, result, {
+      expiration: { type: 'EX', value: 3600 },
+    });
+
+    if (!stored.success) {
+      this.logger.error({
+        message: 'Failed to cache role details',
+        error: stored.error,
+      });
+    }
+
+    return result;
+  }
+
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const requiredRoles = this.reflector.getAllAndOverride<UserRoles>(
       RolesKey,
@@ -49,97 +84,31 @@ export class RolesGuard implements CanActivate {
     const { user } = context.switchToHttp().getRequest<Request>();
 
     if (requiredRoles === UserRoles.DRIVER) {
-      const cacheKey = makeDriverDetailsCacheKey(user.id);
+      const driver = await this.resolveRole(
+        makeDriverDetailsCacheKey(user.id),
+        () =>
+          this.databaseService.driver.findFirst({ where: { userId: user.id } }),
+      );
 
-      const isDriverCache =
-        await this.redisService.get<CachedDriverDetails>(cacheKey);
+      if (!driver) return false;
 
-      if (!isDriverCache.success) {
-        this.logger.error({
-          message: 'Failed to get driver details from cache',
-          error: isDriverCache.error,
-        });
-      }
-
-      if (!isDriverCache.data) {
-        this.logger.debug({
-          message: 'Driver cache miss',
-        });
-      }
-
-      if (isDriverCache.data) {
-        user.driverId = isDriverCache.data.id;
-        return true;
-      }
-
-      const isDriver = (await this.databaseService.driver.findFirst({
-        where: {
-          userId: user.id,
-        },
-      })) satisfies CachedDriverDetails | null;
-
-      if (!isDriver) return false;
-
-      const storeInCache = await this.redisService.set(cacheKey, isDriver, {
-        expiration: { type: 'EX', value: 3600 },
-      });
-
-      if (!storeInCache.success) {
-        this.logger.error({
-          message: 'Failed to cache driver details',
-          error: storeInCache.error,
-        });
-      }
-
-      user.driverId = isDriver.id;
+      user.driverId = driver.id;
 
       return true;
     }
 
     if (requiredRoles === UserRoles.CUSTOMER) {
-      const cacheKey = makeCustomerDetailsCacheKey(user.id);
+      const customer = await this.resolveRole(
+        makeCustomerDetailsCacheKey(user.id),
+        () =>
+          this.databaseService.customer.findFirst({
+            where: { userId: user.id },
+          }),
+      );
 
-      const isCustomerCache =
-        await this.redisService.get<CachedCustomerDetails>(cacheKey);
+      if (!customer) return false;
 
-      if (!isCustomerCache.success) {
-        this.logger.error({
-          message: 'Failed to get customer details from cache',
-          error: isCustomerCache.error,
-        });
-      }
-
-      if (!isCustomerCache.data) {
-        this.logger.debug({
-          message: 'Customer cache miss',
-        });
-      }
-
-      if (isCustomerCache.data) {
-        user.customerId = isCustomerCache.data.id;
-        return true;
-      }
-
-      const isCustomer = (await this.databaseService.customer.findFirst({
-        where: {
-          userId: user.id,
-        },
-      })) satisfies CachedCustomerDetails | null;
-
-      if (!isCustomer) return false;
-
-      const storeInCache = await this.redisService.set(cacheKey, isCustomer, {
-        expiration: { type: 'EX', value: 3600 },
-      });
-
-      if (!storeInCache.success) {
-        this.logger.error({
-          message: 'Failed to cache customer details',
-          error: storeInCache.error,
-        });
-      }
-
-      user.customerId = isCustomer.id;
+      user.customerId = customer.id;
 
       return true;
     }
