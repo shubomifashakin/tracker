@@ -55,7 +55,7 @@ export class AuthController {
     const tokens = await this.authService.login(dto);
     res.cookie(TOKEN.ACCESS.TYPE, tokens.accessToken.token, {
       httpOnly: true,
-      secure: true,
+      secure: false,
       sameSite: 'strict',
       maxAge: TOKEN.ACCESS.EXPIRATION_MS,
       domain: domain,
@@ -63,7 +63,7 @@ export class AuthController {
 
     res.cookie(TOKEN.REFRESH.TYPE, tokens.refreshToken.token, {
       httpOnly: true,
-      secure: true,
+      secure: false,
       sameSite: 'strict',
       maxAge: TOKEN.REFRESH.EXPIRATION_MS,
       domain: domain,
@@ -89,7 +89,7 @@ export class AuthController {
 
     res.cookie(TOKEN.ACCESS.TYPE, tokens.accessToken.token, {
       httpOnly: true,
-      secure: true,
+      secure: false,
       sameSite: 'strict',
       maxAge: TOKEN.ACCESS.EXPIRATION_MS,
       domain: domain,
@@ -97,7 +97,7 @@ export class AuthController {
 
     res.cookie(TOKEN.REFRESH.TYPE, tokens.refreshToken.token, {
       httpOnly: true,
-      secure: true,
+      secure: false,
       sameSite: 'strict',
       maxAge: TOKEN.REFRESH.EXPIRATION_MS,
       domain: domain,
@@ -118,14 +118,14 @@ export class AuthController {
 
     res.clearCookie(TOKEN.ACCESS.TYPE, {
       httpOnly: true,
-      secure: true,
+      secure: false,
       sameSite: 'strict',
       domain,
     });
 
     res.clearCookie(TOKEN.REFRESH.TYPE, {
       httpOnly: true,
-      secure: true,
+      secure: false,
       sameSite: 'strict',
       domain,
     });

@@ -47,10 +47,12 @@ class EnvironmentVariables {
 
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }: { value: string }) => value.replace(/\\n/g, '\n'))
   JWT_PRIVATE_KEY: string;
 
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }: { value: string }) => value.replace(/\\n/g, '\n'))
   JWT_PUBLIC_KEY: string;
 
   @IsNumber()
@@ -111,4 +113,12 @@ export function makeError(error: unknown): Error {
   }
 
   return new Error(String(error));
+}
+
+export function makeDriverDetailsCacheKey(userId: string) {
+  return `user:${userId}:driver`;
+}
+
+export function makeCustomerDetailsCacheKey(userId: string) {
+  return `user:${userId}:customer`;
 }

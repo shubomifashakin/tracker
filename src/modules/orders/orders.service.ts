@@ -279,12 +279,12 @@ export class OrdersService {
         return { message: 'order completed' };
       }
 
-      const cachedStop = await this.cacheStop(orderId, currentStop);
+      const setCacheStop = await this.cacheStop(orderId, currentStop);
 
-      if (!cachedStop.success) {
+      if (!setCacheStop.success) {
         this.logger.error({
           message: `Failed to cache current stop for orderId:${orderId}`,
-          error: cachedStop.error,
+          error: setCacheStop.error,
         });
       }
     }
@@ -338,8 +338,10 @@ export class OrdersService {
 
       const cacheTTlSecs =
         (totalPingsRequired.data * pingInterval.data + BUFFER_MS) / 1000;
-      const totalPings = await this.redisService.increment(
+
+      const totalPings = await this.redisService.incrementWithTTL(
         makeDriverPingKey(driverId, orderId, currentStop.cellId),
+        cacheTTlSecs,
       );
 
       if (!totalPings.success) {
@@ -349,20 +351,6 @@ export class OrdersService {
         });
 
         throw new InternalServerErrorException();
-      }
-
-      if (totalPings.data === 1) {
-        const expired = await this.redisService.expire(
-          makeDriverPingKey(driverId, orderId, currentStop.cellId),
-          cacheTTlSecs,
-        );
-
-        if (!expired.success) {
-          this.logger.error({
-            message: `Failed to set ttl for driver ping count for driverId:${driverId}, orderId:${orderId}, cellId:${currentStop.cellId}`,
-            error: expired.error,
-          });
-        }
       }
 
       if (totalPings.data < totalPingsRequired.data) {
@@ -411,14 +399,14 @@ export class OrdersService {
       });
 
       if (!nextStop) {
-        const deleteStop = await this.redisService.delete(
+        const deletePreviousStopFromCache = await this.redisService.delete(
           makeOrderStopKey(orderId),
         );
 
-        if (!deleteStop.success) {
+        if (!deletePreviousStopFromCache.success) {
           this.logger.error({
-            message: `Failed to delete order stop key for orderId:${orderId}`,
-            error: deleteStop.error,
+            message: `Failed to delete previous stop from cache for orderId:${orderId}`,
+            error: deletePreviousStopFromCache.error,
           });
         }
       }
@@ -447,21 +435,21 @@ export class OrdersService {
     }
   }
 
-  async getAvailableOrders(cursor?: string) {
+  async getAvailableOrders(cursor?: string, limit: number = this.limit) {
     const orders = await this.databaseService.order.findMany({
       where: {
         status: 'PENDING',
       },
       cursor: cursor ? { id: cursor } : undefined,
-      take: this.limit + 1,
+      take: limit + 1,
       orderBy: {
         createdAt: 'desc',
       },
     });
 
-    const hasMore = orders.length > this.limit;
-    const nextCursor = hasMore ? orders[this.limit].id : null;
-    const actualOrders = orders.slice(0, this.limit);
+    const hasMore = orders.length > limit;
+    const nextCursor = hasMore ? orders[limit].id : null;
+    const actualOrders = orders.slice(0, limit);
 
     return { orders: actualOrders, hasMore, nextCursor };
   }
@@ -470,6 +458,7 @@ export class OrdersService {
     customerId: string,
     cursor?: string,
     status?: OrderStatus,
+    limit: number = this.limit,
   ) {
     const orders = await this.databaseService.order.findMany({
       where: {
@@ -477,15 +466,15 @@ export class OrdersService {
         customerId,
       },
       cursor: cursor ? { id: cursor } : undefined,
-      take: this.limit + 1,
+      take: limit + 1,
       orderBy: {
         createdAt: 'desc',
       },
     });
 
-    const hasMore = orders.length > this.limit;
-    const nextCursor = hasMore ? orders[this.limit].id : null;
-    const actualOrders = orders.slice(0, this.limit);
+    const hasMore = orders.length > limit;
+    const nextCursor = hasMore ? orders[limit].id : null;
+    const actualOrders = orders.slice(0, limit);
 
     return { orders: actualOrders, hasMore, nextCursor };
   }
@@ -494,6 +483,7 @@ export class OrdersService {
     driverId: string,
     cursor?: string,
     status?: OrderStatus,
+    limit: number = this.limit,
   ) {
     const orders = await this.databaseService.order.findMany({
       where: {
@@ -501,15 +491,15 @@ export class OrdersService {
         driverId,
       },
       cursor: cursor ? { id: cursor } : undefined,
-      take: this.limit + 1,
+      take: limit + 1,
       orderBy: {
         createdAt: 'desc',
       },
     });
 
-    const hasMore = orders.length > this.limit;
-    const nextCursor = hasMore ? orders[this.limit].id : null;
-    const actualOrders = orders.slice(0, this.limit);
+    const hasMore = orders.length > limit;
+    const nextCursor = hasMore ? orders[limit].id : null;
+    const actualOrders = orders.slice(0, limit);
 
     return { orders: actualOrders, hasMore, nextCursor };
   }

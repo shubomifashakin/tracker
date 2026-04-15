@@ -7,6 +7,17 @@ import {
   ValidateNested,
 } from 'class-validator';
 
+export class OrderDetailsDto {
+  @IsString()
+  description: string;
+
+  @IsNumber()
+  weight: number;
+
+  @IsNumber()
+  value: number;
+}
+
 export class CreateOrderDto {
   @ValidateNested({ each: true })
   @ArrayMinSize(2)
@@ -32,15 +43,4 @@ export class StopDto {
 
   @IsNumber()
   latitude: number;
-}
-
-export class OrderDetailsDto {
-  @IsString()
-  description: string;
-
-  @IsNumber()
-  weight: number;
-
-  @IsNumber()
-  value: number;
 }
