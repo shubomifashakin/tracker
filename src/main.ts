@@ -11,6 +11,10 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
 
 import { AppModule } from './app.module';
+import {
+  PrismaClientKnownRequestFilterFilter,
+  PrismaClientUnknownRequestFilterFilter,
+} from './common';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -34,8 +38,10 @@ async function bootstrap() {
   app.set('trust proxy', true);
   app.enableShutdownHooks([ShutdownSignal.SIGTERM, ShutdownSignal.SIGINT]);
 
-  //FIXME: IMPLEMENT PRISMA FILTERS
-  app.useGlobalFilters();
+  app.useGlobalFilters(
+    new PrismaClientKnownRequestFilterFilter(),
+    new PrismaClientUnknownRequestFilterFilter(),
+  );
 
   app.useGlobalPipes(
     new ValidationPipe({
