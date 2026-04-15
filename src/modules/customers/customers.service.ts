@@ -14,38 +14,20 @@ export class CustomersService {
     private readonly databaseService: DatabaseService,
   ) {}
 
-  async createOrder(userId: string, dto: CreateOrderDto) {
-    const customerId = await this.databaseService.customer.findUniqueOrThrow({
-      where: {
-        userId,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    const ordered = await this.orderService.createOrder(customerId.id, dto);
+  async createOrder(customerId: string, dto: CreateOrderDto) {
+    const ordered = await this.orderService.createOrder(customerId, dto);
 
     return ordered;
   }
 
   async getOrders(
-    userId: string,
+    customerId: string,
     status?: OrderStatus,
     cursor?: string,
     limit?: number,
   ) {
-    const customerId = await this.databaseService.customer.findUniqueOrThrow({
-      where: {
-        userId,
-      },
-      select: {
-        id: true,
-      },
-    });
-
     return this.orderService.getCustomersOrders(
-      customerId.id,
+      customerId,
       cursor,
       status,
       limit,
