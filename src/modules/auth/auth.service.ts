@@ -97,15 +97,26 @@ export class AuthService {
     }
 
     await this.databaseService.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        data: {
+      let user = await tx.user.findUnique({
+        where: {
           email: dto.email,
-          firstName: dto.firstName,
-          lastName: dto.lastName,
-          password: hashedPassword.data,
-          phone: dto.phone,
+        },
+        select: {
+          id: true,
         },
       });
+
+      if (!user) {
+        user = await tx.user.create({
+          data: {
+            email: dto.email,
+            firstName: dto.firstName,
+            lastName: dto.lastName,
+            password: hashedPassword.data,
+            phone: dto.phone,
+          },
+        });
+      }
 
       if (dto.role === UserRoles.DRIVER) {
         await tx.driver.create({
