@@ -3,22 +3,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { AssignDriverDto, DriverPingDto, OrdersService } from '../orders';
 
 import { DatabaseService, RedisService } from '../../core';
-import { VehiclesService } from '../vehicles/vehicles.service';
-import { RegisterVehicleDto } from '../vehicles/common/dtos/register-vehicle.dto';
+import { RegisterVehicleDto, VehiclesService } from '../vehicles';
 
 import { OrderStatus } from '../../../generated/prisma/enums';
-
-type CachedDriverDetails = {
-  id: string;
-  createdAt: Date;
-  updatedAt: Date;
-  isAvailable: boolean;
-  userId: string;
-};
-
-function makeDriverDetailsCacheKey(userId: string) {
-  return `user:${userId}:driver`;
-}
+import { makeDriverDetailsCacheKey } from '../../common';
 
 @Injectable()
 export class DriversService {
@@ -31,63 +19,25 @@ export class DriversService {
     private readonly vehiclesService: VehiclesService,
   ) {}
 
-  private async getDriverDetails(userId: string) {
+  async getVehicles(driverId: string, cursor?: string, limit?: number) {
+    return this.vehiclesService.getVehicles(driverId, cursor, limit);
+  }
+
+  async registerVehicle(driverId: string, dto: RegisterVehicleDto) {
+    return this.vehiclesService.registerVehicle(driverId, dto);
+  }
+
+  async assignToOrder(
+    orderId: string,
+    driverId: string,
+    userId: string,
+    dto: AssignDriverDto,
+  ) {
     const cacheKey = makeDriverDetailsCacheKey(userId);
-
-    const cachedData =
-      await this.redisService.get<CachedDriverDetails>(cacheKey);
-
-    if (!cachedData.success) {
-      this.logger.error({
-        message: 'Failed to get driver details from cache',
-        error: cachedData.error,
-      });
-    }
-
-    if (cachedData.data) {
-      return cachedData.data;
-    }
-
-    const driverId = (await this.databaseService.driver.findFirstOrThrow({
-      where: {
-        userId,
-      },
-    })) satisfies CachedDriverDetails;
-
-    const storeInCache = await this.redisService.set(cacheKey, driverId, {
-      expiration: { type: 'EX', value: 3600 },
-    });
-
-    if (!storeInCache.success) {
-      this.logger.error({
-        message: 'Failed to cache driver details',
-        error: storeInCache.error,
-      });
-    }
-
-    return driverId;
-  }
-
-  async getVehicles(userId: string, cursor?: string, limit?: number) {
-    const driverId = await this.getDriverDetails(userId);
-
-    return this.vehiclesService.getVehicles(driverId.id, cursor, limit);
-  }
-
-  async registerVehicle(userId: string, dto: RegisterVehicleDto) {
-    const driverId = await this.getDriverDetails(userId);
-
-    return this.vehiclesService.registerVehicle(driverId.id, dto);
-  }
-
-  async assignToOrder(orderId: string, userId: string, dto: AssignDriverDto) {
-    const cacheKey = makeDriverDetailsCacheKey(userId);
-
-    const driverId = await this.getDriverDetails(userId);
 
     const assigned = await this.orderService.assignDriver(
       orderId,
-      driverId.id,
+      driverId,
       dto,
     );
 
@@ -102,22 +52,18 @@ export class DriversService {
     return assigned;
   }
 
-  async ping(userId: string, orderId: string, dto: DriverPingDto) {
-    const driverId = await this.getDriverDetails(userId);
-
-    return this.orderService.driverPing(driverId.id, orderId, dto);
+  async ping(driverId: string, orderId: string, dto: DriverPingDto) {
+    return this.orderService.driverPing(driverId, orderId, dto);
   }
 
   async getOrderHistory(
-    userId: string,
+    driverId: string,
     cursor?: string,
     limit?: number,
     status?: OrderStatus,
   ) {
-    const driverId = await this.getDriverDetails(userId);
-
     const available = await this.orderService.getDriverDeliveries(
-      driverId.id,
+      driverId,
       cursor,
       status,
       limit,

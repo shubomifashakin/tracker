@@ -10,23 +10,43 @@ import {
   Controller,
   ParseEnumPipe,
   ParseIntPipe,
+  Logger,
+  ForbiddenException,
 } from '@nestjs/common';
 
 import { DriversService } from './drivers.service';
+import { RegisterVehicleDto } from '../vehicles';
 
 import { AssignDriverDto, DriverPingDto } from '../orders';
-import { AuthGuard } from '../../common';
-import { RegisterVehicleDto } from '../vehicles/common/dtos/register-vehicle.dto';
+import { AuthGuard, Role, RolesGuard, UserRoles } from '../../common';
 import { OrderStatus } from '../../../generated/prisma/enums';
 
-@UseGuards(AuthGuard)
+@UseGuards(AuthGuard, RolesGuard)
+@Role(UserRoles.DRIVER)
 @Controller('drivers')
 export class DriversController {
+  private readonly logger = new Logger(DriversController.name);
+
   constructor(private readonly driversService: DriversService) {}
+
+  private requireDriverId(req: Request): string {
+    if (!req.user.driverId) {
+      this.logger.warn({
+        message: 'Driver ID not found in user object',
+        userId: req.user.id,
+      });
+
+      throw new ForbiddenException();
+    }
+
+    return req.user.driverId;
+  }
 
   @Post('vehicles')
   registerVehicle(@Body() dto: RegisterVehicleDto, @Req() req: Request) {
-    return this.driversService.registerVehicle(req.user.id, dto);
+    const driverId = this.requireDriverId(req);
+
+    return this.driversService.registerVehicle(driverId, dto);
   }
 
   @Get('vehicles')
@@ -35,7 +55,9 @@ export class DriversController {
     @Query('limit') limit?: number,
     @Query('cursor') cursor?: string,
   ) {
-    return this.driversService.getVehicles(req.user.id, cursor, limit);
+    const driverId = this.requireDriverId(req);
+
+    return this.driversService.getVehicles(driverId, cursor, limit);
   }
 
   @Post('orders/:orderId/assign')
@@ -44,23 +66,27 @@ export class DriversController {
     @Body() dto: AssignDriverDto,
     @Param('orderId') orderId: string,
   ) {
-    return this.driversService.assignToOrder(orderId, req.user.id, dto);
+    const driverId = this.requireDriverId(req);
+
+    return this.driversService.assignToOrder(
+      orderId,
+      driverId,
+      req.user.id,
+      dto,
+    );
   }
 
   @Get('orders')
   getOrders(
     @Req() req: Request,
     @Query('cursor') cursor?: string,
-    @Query('limit', ParseIntPipe) limit?: number,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
     @Query('status', new ParseEnumPipe(OrderStatus, { optional: true }))
     status?: OrderStatus,
   ) {
-    return this.driversService.getOrderHistory(
-      req.user.id,
-      cursor,
-      limit,
-      status,
-    );
+    const driverId = this.requireDriverId(req);
+
+    return this.driversService.getOrderHistory(driverId, cursor, limit, status);
   }
 
   @Post('orders/:orderId/ping')
@@ -69,6 +95,8 @@ export class DriversController {
     @Body() dto: DriverPingDto,
     @Param('orderId') orderId: string,
   ) {
-    return this.driversService.ping(req.user.id, orderId, dto);
+    const driverId = this.requireDriverId(req);
+
+    return this.driversService.ping(driverId, orderId, dto);
   }
 }
