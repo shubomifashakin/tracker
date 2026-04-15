@@ -9,8 +9,7 @@ import {
   ExecutionContext,
   UnauthorizedException,
 } from '@nestjs/common';
-
-import { TOKEN } from '../../constants';
+import { TOKEN } from '../constants';
 
 @Injectable()
 export class AuthGuard implements CanActivate {

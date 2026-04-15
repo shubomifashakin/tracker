@@ -114,3 +114,11 @@ export function makeError(error: unknown): Error {
 
   return new Error(String(error));
 }
+
+export function makeDriverDetailsCacheKey(userId: string) {
+  return `user:${userId}:driver`;
+}
+
+export function makeCustomerDetailsCacheKey(userId: string) {
+  return `user:${userId}:customer`;
+}
